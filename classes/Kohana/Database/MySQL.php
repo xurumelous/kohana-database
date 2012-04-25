@@ -322,6 +322,28 @@ class Kohana_Database_MySQL extends Database {
 
 	public function list_tables($like = NULL)
 	{
+        if ($this->_config['cache_tables'])
+        {
+            $key = 'kohana_tables_';
+            $key .= $this->_config['connection']['hostname'];
+            $key .= $this->_config['connection']['database'];
+            $key .= $this->_config['connection']['username'];
+
+            try
+            {
+                $cache = Cache::instance(isset($this->_config['cache_group']) ? $this->_config['cache_group'] : NULL);
+                $data  = $cache->get($key);
+
+                if ($data !== NULL)
+                {
+                    return $data;
+                }
+            }
+            catch (Cache_Exception $e) {
+                throw new Database_Exception('Could not send tables to cache. Verify your configuration.');
+            }
+        }
+
 		if (is_string($like))
 		{
 			// Search for table names
@@ -339,11 +361,37 @@ class Kohana_Database_MySQL extends Database {
 			$tables[] = reset($row);
 		}
 
+        if (isset($cache))
+        {
+            $cache->set($key, $tables, isset($this->_config['caching_lifetime']) ? $this->_config['caching_lifetime'] : Cache::DEFAULT_EXPIRE);
+        }
+
 		return $tables;
 	}
 
 	public function list_columns($table, $like = NULL, $add_prefix = TRUE)
 	{
+        if ($this->_config['cache_columns'])
+        {
+            $key = 'kohana_columns_'.$table;
+            $key .= ( ! is_null($like)) ? $like : '';
+            $key .= $add_prefix ? 'true' : 'false';
+
+            try
+            {
+                $cache = Cache::instance(isset($this->_config['cache_group']) ? $this->_config['cache_group'] : NULL);
+                $data  = $cache->get($key);
+
+                if ($data !== NULL)
+                {
+                    return $data;
+                }
+            }
+            catch (Cache_Exception $e) {
+                throw new Database_Exception('Could not send table columns to cache. Verify your configuration.');
+            }
+        }
+
 		// Quote the table name
 		$table = ($add_prefix === TRUE) ? $this->quote_table($table) : $table;
 
@@ -420,6 +468,11 @@ class Kohana_Database_MySQL extends Database {
 
 			$columns[$row['Field']] = $column;
 		}
+
+        if (isset($cache))
+        {
+            $cache->set($key, $columns, isset($this->_config['caching_lifetime']) ? $this->_config['caching_lifetime'] : Cache::DEFAULT_EXPIRE);
+        }
 
 		return $columns;
 	}
